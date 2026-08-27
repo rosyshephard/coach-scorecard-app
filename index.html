@@ -43,6 +43,7 @@
 }
 
 *,*::before,*::after{box-sizing:border-box}
+i{font-style:normal}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--ground);color:var(--ink);
   font:400 16px/1.55 "Source Sans 3",ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
@@ -94,7 +95,9 @@ tbody tr.watch{background:var(--critical-soft)}
 .sub-note{display:block;font-family:"Source Sans 3",sans-serif;font-weight:400;font-size:.78rem;color:var(--ink-soft);margin-top:2px}
 .chips{display:inline-flex;gap:4px;justify-content:flex-end}
 .chip{font-family:"IBM Plex Mono",monospace;font-size:.8rem;font-weight:600;width:24px;height:24px;
-  display:grid;place-items:center;border-radius:3px}
+  display:grid;place-items:center;border-radius:3px;cursor:default}
+.chip-key{display:block;font-family:"IBM Plex Mono",monospace;font-size:.6rem;font-weight:500;
+  letter-spacing:.14em;color:var(--ink-soft);margin-top:3px}
 .s1{background:var(--critical-soft);color:var(--critical);box-shadow:inset 0 0 0 1px var(--critical)}
 .s2{background:var(--surface-sunk);color:var(--ink-mid)}
 .s3{background:var(--good-soft);color:var(--good)}
@@ -286,7 +289,9 @@ window.renderDashboard = function (D) {
     mh.appendChild(el("div", null,
       '<span class="k">' + esc(p[0]) + '</span><span class="v">' + esc(p[1]) + '</span>'));
   });
-  document.getElementById("th-scores").textContent = "Scores (" + D.last_scored + ")";
+  document.getElementById("th-scores").innerHTML =
+    "Scores <span class=\"chip-key\">" + esc(D.last_scored) +
+    "</span><span class=\"chip-key\">A&nbsp;&nbsp;T&nbsp;&nbsp;F&nbsp;&nbsp;V</span>";
   document.getElementById("stale-note").textContent = D.staleness_note || "";
   document.getElementById("foot-cov").textContent = "Cycle " + D.cycle + " · " + (D.coverage || "");
 
@@ -309,9 +314,13 @@ window.renderDashboard = function (D) {
   });
 
   /* table -- ordered best total first, escalations last regardless */
-  var byStanding = D.coaches.slice().sort(function(a, b){
+  var byStanding = D.coaches.slice().sort(function (a, b) {
     if (a.escalated !== b.escalated) return a.escalated ? 1 : -1;
-    return total(b) - total(a);
+    if (total(a) !== total(b)) return total(b) - total(a);
+    if (a.deep !== b.deep) return a.deep - b.deep;                 // less drift first
+    var sa = a.marginal + a.drift, sb = b.marginal + b.drift;
+    if (sa !== sb) return sa - sb;
+    return a.name.localeCompare(b.name);
   });
   function total(c){ return c.scores.reduce(function(x, y){ return x + y; }, 0); }
   function statusOf(c){
@@ -324,8 +333,10 @@ window.renderDashboard = function (D) {
   }
   var tb = document.getElementById("rows");
   byStanding.forEach(function(c){
-    var chips = c.scores.map(function(s){
-      return '<i class="chip s' + (s || 0) + '">' + (s || "–") + "</i>";
+    var CAT = ["Administrative", "Timeliness", "Client Feedback", "Core Values"];
+    var chips = c.scores.map(function (s, i) {
+      return '<i class="chip s' + (s || 0) + '" title="' + CAT[i] + ': ' +
+             (s || "not scored") + '">' + (s || "–") + "</i>";
     }).join("");
     var st = statusOf(c);
     var fu = c.fu_dates_valid
