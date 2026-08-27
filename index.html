@@ -133,6 +133,24 @@ tbody tr.watch{background:var(--critical-soft)}
 .cav h3{font-size:.83rem;font-weight:600;letter-spacing:.02em;color:var(--accent)}
 .cav p{margin:0;font-size:.87rem;color:var(--ink-mid)}
 
+.fixes{display:flex;flex-direction:column;gap:12px}
+.fix{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warning);
+  border-radius:6px;padding:16px 20px;box-shadow:var(--shadow);display:flex;
+  flex-direction:column;gap:10px}
+.fix.esc{border-left-color:var(--critical)}
+.fix.unexplained{border-left-style:dashed}
+.fix-head{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}
+.fix-head .who{font-family:Archivo,sans-serif;font-weight:700;font-size:1rem}
+.fix-head .cat{font-family:Archivo,sans-serif;font-weight:600;font-size:.9rem;color:var(--ink-mid)}
+.fix-head .rc{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.74rem;
+  color:var(--ink-soft);white-space:nowrap}
+.fix ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;
+  font-size:.91rem;color:var(--ink-mid)}
+.fix .std{font-size:.87rem;color:var(--ink-mid);background:var(--surface-sunk);
+  border-radius:4px;padding:10px 13px}
+.fix .std b{font-family:Archivo,sans-serif;font-weight:600;color:var(--ink);
+  font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;display:block;margin-bottom:3px}
+.fix .warn{font-size:.87rem;color:var(--warning)}
 .note{margin:0;font-size:.87rem;color:var(--ink-mid);max-width:78ch}
 .fallback{background:var(--warning-soft);border:1px solid var(--warning);border-radius:6px;
   padding:16px 20px;color:var(--ink);font-size:.9rem}
@@ -211,6 +229,15 @@ footer a:hover,footer a:focus-visible{border-bottom-color:currentColor}
         <tbody id="rows"></tbody>
       </table>
     </div>
+  </section>
+
+  <section id="fix-section" hidden>
+    <div class="sec-head">
+      <h2>What needs correcting</h2>
+      <p>Every area scored 1, the measured evidence behind it, and what meets standard.
+         A score of 1 escalates regardless of total.</p>
+    </div>
+    <div class="fixes" id="fixes"></div>
   </section>
 
   <section>
@@ -358,6 +385,30 @@ window.renderDashboard = function (D) {
       '<td><span class="tag ' + st[0] + '">' + st[1] + "</span></td>");
     tb.appendChild(tr);
   });
+
+  /* what needs correcting -- the table says a coach is failing; this says why */
+  var fixes = document.getElementById("fixes");
+  var anyFix = false;
+  byStanding.slice().reverse().forEach(function (c) {
+    (c.findings || []).forEach(function (f) {
+      anyFix = true;
+      var cls = "fix" + (c.escalated ? " esc" : "") + (f.unexplained ? " unexplained" : "");
+      var lis = f.evidence.map(function (e) { return "<li>" + esc(e) + "</li>"; }).join("");
+      fixes.appendChild(el("div", cls,
+        '<div class="fix-head">' +
+          '<span class="who">' + esc(c.name) + "</span>" +
+          '<span class="cat">' + esc(f.category) + " scored " + f.score + "</span>" +
+          '<span class="rc">re-check ' + esc(f.recheck) + "</span>" +
+        "</div>" +
+        (f.unexplained
+          ? '<p class="warn">This score has no measured evidence and no recorded ' +
+            'observation. It should not reach the coach until one is written down.</p>'
+          : "") +
+        "<ul>" + lis + "</ul>" +
+        '<div class="std"><b>Meets standard</b>' + esc(f.expectation) + "</div>"));
+    });
+  });
+  if (anyFix) document.getElementById("fix-section").hidden = false;
 
   /* staleness bars -- worst last so the eye lands on drift */
   var byClean = D.coaches.slice().sort(function(a, b){
