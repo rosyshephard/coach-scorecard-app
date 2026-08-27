@@ -133,6 +133,11 @@ tbody tr.watch{background:var(--critical-soft)}
 .cav h3{font-size:.83rem;font-weight:600;letter-spacing:.02em;color:var(--accent)}
 .cav p{margin:0;font-size:.87rem;color:var(--ink-mid)}
 
+#age{font-family:"IBM Plex Mono",monospace;font-size:.94rem;font-weight:500}
+#age.stale{color:var(--warning)}
+#age.very-stale{color:var(--critical)}
+.shape-warn{background:var(--warning-soft);border:1px solid var(--warning);
+  border-radius:6px;padding:14px 18px;font-size:.9rem;color:var(--ink)}
 .fixes{display:flex;flex-direction:column;gap:12px}
 .fix{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warning);
   border-radius:6px;padding:16px 20px;box-shadow:var(--shadow);display:flex;
@@ -307,15 +312,46 @@ window.renderDashboard = function (D) {
   var openCount = (D.escalations || []).length;
   var meta = [
     ["Cycle", D.cycle],
-    ["Cadence", D.cadence],
+    ["Refreshed", '<span id="age">\u2014</span>'],
     ["Scored", D.last_scored],
     ["Open", openCount + (openCount === 1 ? " escalation" : " escalations")]
   ];
   var mh = document.getElementById("meta");
-  meta.forEach(function(p){
+  meta.forEach(function (p) {
+    var v = p[0] === "Refreshed" ? p[1] : esc(p[1]);
     mh.appendChild(el("div", null,
-      '<span class="k">' + esc(p[0]) + '</span><span class="v">' + esc(p[1]) + '</span>'));
+      '<span class="k">' + esc(p[0]) + '</span><span class="v">' + v + '</span>'));
   });
+
+  /* Data age. The page deploys instantly but the payload only changes when the
+     refresh runs, so age has to be visible or a stale dashboard looks current. */
+  (function () {
+    var node = document.getElementById("age");
+    if (!node) return;
+    if (!D.generated_at) { node.textContent = D.cycle || "unknown"; return; }
+    var mins = Math.max(0, Math.round((Date.now() - new Date(D.generated_at)) / 60000));
+    var txt = mins < 2 ? "just now"
+            : mins < 60 ? mins + " min ago"
+            : mins < 60 * 36 ? Math.round(mins / 60) + "h ago"
+            : Math.round(mins / 1440) + "d ago";
+    node.textContent = txt;
+    node.className = mins > 60 * 24 ? "very-stale" : mins > 60 * 6 ? "stale" : "";
+    node.title = "Figures generated " + D.generated_at;
+  })();
+
+  /* A payload written before a feature existed renders that section empty. Say
+     so rather than silently omitting it. */
+  (function () {
+    var needs = D.coaches.filter(function (c) { return c.scores.indexOf(1) !== -1; });
+    var hasKey = D.coaches.some(function (c) { return "findings" in c; });
+    if (needs.length && !hasKey) {
+      document.getElementById("alerts").appendChild(el("div", "shape-warn",
+        "<strong>This data predates the &ldquo;what needs correcting&rdquo; feature.</strong> " +
+        needs.length + " coach" + (needs.length === 1 ? " has" : "es have") +
+        " a score of 1, but the payload carries no findings, so that section cannot render. " +
+        "Re-run the weekly refresh to populate it."));
+    }
+  })();
   document.getElementById("th-scores").innerHTML =
     "Scores <span class=\"chip-key\">" + esc(D.last_scored) +
     "</span><span class=\"chip-key\">A&nbsp;&nbsp;T&nbsp;&nbsp;F&nbsp;&nbsp;V</span>";
